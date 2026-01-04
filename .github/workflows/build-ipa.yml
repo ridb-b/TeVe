@@ -16,26 +16,32 @@ jobs:
 
       - name: Clean and Create Project
         run: |
+          # Corregimos el nombre del paquete para evitar errores de Dart
           sed -i '' 's/name: TeVe/name: teve/g' pubspec.yaml
+          # Borramos cualquier configuración vieja y creamos una nueva y limpia
           rm -rf ios
           flutter create . --platforms=ios --project-name=teve
           flutter pub get
 
-      - name: Advanced Podfile Patch
+      - name: Create Perfect Podfile
         run: |
-          cd ios
-          # Elimina cualquier bloque post_install previo para evitar duplicados
-          sed -i '' '/post_install do |installer|/,/end/d' Podfile
-          # Forzar iOS 13 y desactivar Bitcode para compatibilidad con Xcode 16
-          echo "post_install do |installer|" >> Podfile
-          echo "  installer.pods_project.targets.each do |target|" >> Podfile
-          echo "    target.build_configurations.each do |config|" >> Podfile
-          echo "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'" >> Podfile
-          echo "      config.build_settings['ENABLE_BITCODE'] = 'NO'" >> Podfile
-          echo "    end" >> Podfile
-          echo "  end" >> Podfile
-          echo "end" >> Podfile
-          cd ..
+          # En lugar de editar, borramos y escribimos un Podfile perfecto desde cero
+          rm -f ios/Podfile
+          cat <<EOF > ios/Podfile
+          platform :ios, '13.0'
+          use_frameworks!
+          target 'Runner' do
+            flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+          end
+          post_install do |installer|
+            installer.pods_project.targets.each do |target|
+              target.build_configurations.each do |config|
+                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+                config.build_settings['ENABLE_BITCODE'] = 'NO'
+              end
+            end
+          end
+          EOF
 
       - name: Install Dependencies
         run: |
