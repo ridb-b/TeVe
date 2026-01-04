@@ -1,4 +1,4 @@
-name: Build IPA (Fixed Post-Install)
+name: Build IPA Final
 on: [workflow_dispatch]
 
 jobs:
@@ -8,53 +8,43 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install Flutter (Version compatible)
+      - name: Install Flutter (Version 3.3.10)
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.3.10'
           channel: 'stable'
 
-      - name: Saneamiento y Creación de Proyecto
+      - name: Clean and Create Project
         run: |
-          # 1. Corregir nombre del paquete (prohibidas las mayúsculas)
           sed -i '' 's/name: TeVe/name: teve/g' pubspec.yaml
-          
-          # 2. Recrear carpeta iOS limpia
           rm -rf ios
           flutter create . --platforms=ios --project-name=teve
           flutter pub get
 
-      - name: Parche de Podfile Anti-Duplicación
+      - name: Advanced Podfile Patch
         run: |
           cd ios
-          # 1. Borramos CUALQUIER post_install que Flutter haya creado automáticamente
+          # Elimina cualquier bloque post_install previo para evitar duplicados
           sed -i '' '/post_install do |installer|/,/end/d' Podfile
-          
-          # 2. Forzamos la plataforma a iOS 13
-          sed -i '' "s/platform :ios, '11.0'/platform :ios, '13.0'/g" Podfile
-          
-          # 3. Insertamos nuestro propio bloque limpio al final del archivo
-          cat <<EOF >> Podfile
-
-post_install do |installer|
-  installer.pods_project.targets.each do |target|
-    target.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
-      config.build_settings['ENABLE_BITCODE'] = 'NO'
-    end
-  end
-end
-EOF
+          # Forzar iOS 13 y desactivar Bitcode para compatibilidad con Xcode 16
+          echo "post_install do |installer|" >> Podfile
+          echo "  installer.pods_project.targets.each do |target|" >> Podfile
+          echo "    target.build_configurations.each do |config|" >> Podfile
+          echo "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'" >> Podfile
+          echo "      config.build_settings['ENABLE_BITCODE'] = 'NO'" >> Podfile
+          echo "    end" >> Podfile
+          echo "  end" >> Podfile
+          echo "end" >> Podfile
           cd ..
 
-      - name: Instalación de Dependencias
+      - name: Install Dependencies
         run: |
           cd ios
           pod repo update
           pod install
           cd ..
 
-      - name: Build IPA (Unsigned)
+      - name: Build IPA
         run: flutter build ipa --release --no-codesign --build-number=1 --build-name=1.0.0
 
       - name: Upload IPA
