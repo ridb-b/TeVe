@@ -14,10 +14,16 @@ jobs:
           flutter-version: '3.3.10'
           channel: 'stable'
 
+      - name: Create iOS Project Files
+        run: |
+          # Esto crea la carpeta 'ios' que falta en el repositorio
+          flutter create . --platforms=ios
+          flutter pub get
+
       - name: Patch Podfile Deployment Target
         run: |
-          # Este comando busca las líneas de configuración de iOS y las sube a 13.0 para evitar el error de libarclite
-          sed -i '' "s/platform :ios, '9.0'/platform :ios, '13.0'/g" ios/Podfile
+          # Ahora que el archivo existe, lo parcheamos para iOS 13
+          sed -i '' "s/platform :ios, '11.0'/platform :ios, '13.0'/g" ios/Podfile
           echo "post_install do |installer|
             installer.pods_project.targets.each do |target|
               target.build_configurations.each do |config|
@@ -28,7 +34,6 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          flutter pub get
           cd ios
           pod install --repo-update
           cd ..
