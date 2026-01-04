@@ -1,5 +1,5 @@
 name: Build IPA
-on: [workflow_dispatch] # Esto permite que lo actives manualmente
+on: [workflow_dispatch]
 
 jobs:
   build:
@@ -8,9 +8,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install Flutter
+      - name: Install Flutter (Version compatible)
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.3.10' # Forzamos la versión que el proyecto pide
           channel: 'stable'
 
       - name: Install Dependencies
