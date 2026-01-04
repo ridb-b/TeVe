@@ -1,4 +1,4 @@
-name: Build IPA
+name: Build IPA (Final Stable)
 on: [workflow_dispatch]
 
 jobs:
@@ -14,36 +14,43 @@ jobs:
           flutter-version: '3.3.10'
           channel: 'stable'
 
-      - name: Fix Package Name and Create iOS
+      - name: Precaución 1 - Saneamiento de Proyecto
         run: |
-          # Forzamos el nombre a minúsculas en el pubspec para evitar el error de la imagen
+          # Corregir nombre del paquete (prohibidas las mayúsculas en Dart)
           sed -i '' 's/name: TeVe/name: teve/g' pubspec.yaml
-          # Creamos la carpeta de iOS con el nombre correcto
+          # Generar carpeta iOS desde cero para evitar archivos corruptos
+          rm -rf ios
           flutter create . --platforms=ios --project-name=teve
           flutter pub get
 
-      - name: Patch Podfile Deployment Target
-        run: |
-          # Ajustamos para que Xcode 16 no de error de compatibilidad
-          if [ -f ios/Podfile ]; then
-            sed -i '' "s/platform :ios, '11.0'/platform :ios, '13.0'/g" ios/Podfile
-            echo "post_install do |installer|
-              installer.pods_project.targets.each do |target|
-                target.build_configurations.each do |config|
-                  config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
-                end
-              end
-            end" >> ios/Podfile
-          fi
-
-      - name: Install Dependencies
+      - name: Precaución 2 - Parche de Arquitectura y SDK
         run: |
           cd ios
-          pod install --repo-update
+          # Forzar compatibilidad con iOS 13 (evita error libarclite en Xcode 16)
+          sed -i '' "s/platform :ios, '11.0'/platform :ios, '13.0'/g" Podfile
+          
+          # Sobrescribir post_install para asegurar que CADA plugin use iOS 13
+          cat <<EOF >> Podfile
+          post_install do |installer|
+            installer.pods_project.targets.each do |target|
+              target.build_configurations.each do |config|
+                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+                config.build_settings['ENABLE_BITCODE'] = 'NO'
+              end
+            end
+          end
+          EOF
+          cd ..
+
+      - name: Precaución 3 - Instalación Limpia de Dependencias
+        run: |
+          cd ios
+          pod repo update
+          pod install
           cd ..
 
       - name: Build IPA (Unsigned)
-        run: flutter build ipa --release --no-codesign
+        run: flutter build ipa --release --no-codesign --build-number=1 --build-name=1.0.0
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
