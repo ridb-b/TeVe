@@ -1,4 +1,4 @@
-name: Build IPA (Final Stable)
+name: Build IPA (Fixed Post-Install)
 on: [workflow_dispatch]
 
 jobs:
@@ -14,35 +14,40 @@ jobs:
           flutter-version: '3.3.10'
           channel: 'stable'
 
-      - name: Precaución 1 - Saneamiento de Proyecto
+      - name: Saneamiento y Creación de Proyecto
         run: |
-          # Corregir nombre del paquete (prohibidas las mayúsculas en Dart)
+          # 1. Corregir nombre del paquete (prohibidas las mayúsculas)
           sed -i '' 's/name: TeVe/name: teve/g' pubspec.yaml
-          # Generar carpeta iOS desde cero para evitar archivos corruptos
+          
+          # 2. Recrear carpeta iOS limpia
           rm -rf ios
           flutter create . --platforms=ios --project-name=teve
           flutter pub get
 
-      - name: Precaución 2 - Parche de Arquitectura y SDK
+      - name: Parche de Podfile Anti-Duplicación
         run: |
           cd ios
-          # Forzar compatibilidad con iOS 13 (evita error libarclite en Xcode 16)
+          # 1. Borramos CUALQUIER post_install que Flutter haya creado automáticamente
+          sed -i '' '/post_install do |installer|/,/end/d' Podfile
+          
+          # 2. Forzamos la plataforma a iOS 13
           sed -i '' "s/platform :ios, '11.0'/platform :ios, '13.0'/g" Podfile
           
-          # Sobrescribir post_install para asegurar que CADA plugin use iOS 13
+          # 3. Insertamos nuestro propio bloque limpio al final del archivo
           cat <<EOF >> Podfile
-          post_install do |installer|
-            installer.pods_project.targets.each do |target|
-              target.build_configurations.each do |config|
-                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
-                config.build_settings['ENABLE_BITCODE'] = 'NO'
-              end
-            end
-          end
-          EOF
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      config.build_settings['ENABLE_BITCODE'] = 'NO'
+    end
+  end
+end
+EOF
           cd ..
 
-      - name: Precaución 3 - Instalación Limpia de Dependencias
+      - name: Instalación de Dependencias
         run: |
           cd ios
           pod repo update
