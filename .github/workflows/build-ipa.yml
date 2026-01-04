@@ -14,23 +14,27 @@ jobs:
           flutter-version: '3.3.10'
           channel: 'stable'
 
-      - name: Create iOS Project Files
+      - name: Fix Package Name and Create iOS
         run: |
-          # Esto crea la carpeta 'ios' que falta en el repositorio
-          flutter create . --platforms=ios
+          # Forzamos el nombre a minúsculas en el pubspec para evitar el error de la imagen
+          sed -i '' 's/name: TeVe/name: teve/g' pubspec.yaml
+          # Creamos la carpeta de iOS con el nombre correcto
+          flutter create . --platforms=ios --project-name=teve
           flutter pub get
 
       - name: Patch Podfile Deployment Target
         run: |
-          # Ahora que el archivo existe, lo parcheamos para iOS 13
-          sed -i '' "s/platform :ios, '11.0'/platform :ios, '13.0'/g" ios/Podfile
-          echo "post_install do |installer|
-            installer.pods_project.targets.each do |target|
-              target.build_configurations.each do |config|
-                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+          # Ajustamos para que Xcode 16 no de error de compatibilidad
+          if [ -f ios/Podfile ]; then
+            sed -i '' "s/platform :ios, '11.0'/platform :ios, '13.0'/g" ios/Podfile
+            echo "post_install do |installer|
+              installer.pods_project.targets.each do |target|
+                target.build_configurations.each do |config|
+                  config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+                end
               end
-            end
-          end" >> ios/Podfile
+            end" >> ios/Podfile
+          fi
 
       - name: Install Dependencies
         run: |
